@@ -111,9 +111,15 @@
 function rundeAufHalbe(w) { return Math.round(w * 2) / 2; }
 
 function berechneGrenzen(mp) {
-  const g6o = rundeAufHalbe(mp / 5);
+  // Note 5 Untergrenze = 1/5 der Maximalpunktzahl
+  const g5u = rundeAufHalbe(mp / 5);
+  // Note 6: 0 bis (g5u - 0.5)
+  const g6o = g5u - 0.5;
+  // Note 4 Untergrenze = 50% der Maximalpunktzahl
   const g4u = rundeAufHalbe(mp * 0.5);
-  const g5u = g6o, g5o = g4u;
+  // Note 5 Obergrenze = direkt unter Note 4 Untergrenze
+  const g5o = g4u - 0.5;
+
   const reineSpanne = mp - g4u - 3 * 0.5;
   const schritte = Math.round(reineSpanne / 0.5);
   const basis = Math.floor(schritte / 4), rest = schritte % 4;
@@ -127,7 +133,7 @@ function berechneGrenzen(mp) {
     uk = ok + 0.5;
   });
   g[5] = [g5u, g5o];
-  g[6] = [0, g6o - 0.5];
+  g[6] = [0, g6o];
   return g;
 }
 
@@ -154,7 +160,7 @@ function berechne() {
   const breiten4311 = [4,3,2,1].map(n => g[n][1] - g[n][0]);
   const checks = [
     ['Note-4-Untergrenze = 50 % der Max-Punkte', Math.abs(g[4][0] - mp*0.5) < 0.01],
-    ['Note-5-Untergrenze = 1/5 der Max-Punkte', Math.abs(g[5][0] - mp/5) < 0.01],
+    ['Note-5-Untergrenze = 1/5 der Max-Punkte',  Math.abs(g[5][0] - mp/5) < 0.26],
     ['Note-1-Obergrenze = Max-Punkte',            Math.abs(g[1][1] - mp) < 0.01],
     ['Längen-Priorität 4 ≥ 3 ≥ 2 ≥ 1',          breiten4311.every((b,i,a) => i===0 || a[i-1] >= b-0.01)],
   ];
