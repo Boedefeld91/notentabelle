@@ -113,7 +113,7 @@ function rundeAufHalbe(w) { return Math.round(w * 2) / 2; }
 function berechneGrenzen(mp) {
   const g6o = rundeAufHalbe(mp / 5);
   const g4u = rundeAufHalbe(mp * 0.5);
-  const g5u = g6o + 0.5, g5o = g4u - 0.5;
+  const g5u = g6o, g5o = g4u;
   const reineSpanne = mp - g4u - 3 * 0.5;
   const schritte = Math.round(reineSpanne / 0.5);
   const basis = Math.floor(schritte / 4), rest = schritte % 4;
