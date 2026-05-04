@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notentabelle-Generator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f5f5f5;
+    color: #1a1a1a;
+    padding: 24px 16px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .sub { font-size: 14px; color: #666; margin-bottom: 20px; }
+  hr { border: none; border-top: 1px solid #ddd; margin-bottom: 20px; }
+
+  .eingabe {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .eingabe label { font-size: 15px; }
+  .eingabe input {
+    font-size: 16px;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    width: 110px;
+    background: white;
+    -webkit-appearance: none;
+  }
+  .eingabe input:focus { outline: 2px solid #0078d4; border-color: transparent; }
+  .eingabe button {
+    font-size: 15px;
+    font-weight: 600;
+    padding: 8px 20px;
+    background: #0078d4;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .eingabe button:active { background: #005fa3; }
+
+  .tabelle-wrapper { overflow-x: auto; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; background: white; border-radius: 12px; overflow: hidden; }
+  thead tr { background: #e8e8e8; }
+  th { padding: 10px 14px; text-align: center; font-size: 13px; font-weight: 600; color: #444; white-space: nowrap; }
+  th:nth-child(2) { text-align: left; }
+  td { padding: 9px 14px; text-align: center; border-top: 1px solid rgba(0,0,0,0.06); }
+  td:nth-child(2) { text-align: left; }
+
+  .note-gruen { background: #d4edda; color: #155724; }
+  .note-gelb  { background: #fff3cd; color: #856404; }
+  .note-rot   { background: #f8d7da; color: #721c24; }
+
+  .checks { display: flex; flex-wrap: wrap; gap: 8px; }
+  .check-pill {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+  }
+  .check-ok   { background: #d4edda; color: #155724; }
+  .check-fail { background: #f8d7da; color: #721c24; }
+
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 10px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Notentabelle-Generator</h1>
+<p class="sub">Punktegrenzen nach Schulnoten berechnen</p>
+<hr>
+
+<div class="eingabe">
+  <label for="maxInput">Maximalpunktzahl:</label>
+  <input type="number" id="maxInput" value="100" min="1" step="0.5" inputmode="decimal">
+  <button onclick="berechne()">Berechnen</button>
+</div>
+
+<div class="tabelle-wrapper">
+  <table id="tabelle">
+    <thead>
+      <tr>
+        <th>Note</th>
+        <th>Bezeichnung</th>
+        <th>Von (inkl.)</th>
+        <th>Bis (inkl.)</th>
+        <th>Breite</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<div class="section-label">Plausibilitätsprüfung</div>
+<div class="checks" id="checks"></div>
+
+<script>
+function rundeAufHalbe(w) { return Math.round(w * 2) / 2; }
+
+function berechneGrenzen(mp) {
+  const g6o = rundeAufHalbe(mp / 5);
+  const g4u = rundeAufHalbe(mp * 0.5);
+  const g5u = g6o + 0.5, g5o = g4u - 0.5;
+  const reineSpanne = mp - g4u - 3 * 0.5;
+  const schritte = Math.round(reineSpanne / 0.5);
+  const basis = Math.floor(schritte / 4), rest = schritte % 4;
+  const breiten = [basis*0.5, basis*0.5, basis*0.5, basis*0.5];
+  for (let i = 0; i < rest; i++) breiten[i] += 0.5;
+  const g = {};
+  let uk = g4u;
+  [4, 3, 2, 1].forEach((n, i) => {
+    const ok = uk + breiten[i];
+    g[n] = [uk, ok];
+    uk = ok + 0.5;
+  });
+  g[5] = [g5u, g5o];
+  g[6] = [0, g6o];
+  return g;
+}
+
+function berechne() {
+  const raw = document.getElementById('maxInput').value.replace(',', '.');
+  const mp = parseFloat(raw);
+  if (!mp || mp <= 0) { alert('Bitte eine positive Zahl eingeben (z. B. 100 oder 57,5).'); return; }
+
+  const g = berechneGrenzen(mp);
+  const bez = {1:'Sehr gut', 2:'Gut', 3:'Befriedigend', 4:'Ausreichend', 5:'Mangelhaft', 6:'Ungenügend'};
+  const cls = {1:'note-gruen', 2:'note-gruen', 3:'note-gelb', 4:'note-gelb', 5:'note-rot', 6:'note-rot'};
+
+  document.getElementById('tbody').innerHTML = [1,2,3,4,5,6].map(n => {
+    const [u, o] = g[n], b = o - u;
+    return `<tr class="${cls[n]}">
+      <td><strong>${n}</strong></td>
+      <td>${bez[n]}</td>
+      <td>${u.toFixed(1)}</td>
+      <td>${o.toFixed(1)}</td>
+      <td>${b.toFixed(1)}</td>
+    </tr>`;
+  }).join('');
+
+  const breiten4311 = [4,3,2,1].map(n => g[n][1] - g[n][0]);
+  const checks = [
+    ['Note-4-Untergrenze = 50 % der Max-Punkte', Math.abs(g[4][0] - mp*0.5) < 0.01],
+    ['Note-6-Obergrenze = 1/5 der Max-Punkte',   Math.abs(g[6][1] - mp/5) < 0.26],
+    ['Note-1-Obergrenze = Max-Punkte',            Math.abs(g[1][1] - mp) < 0.01],
+    ['Längen-Priorität 4 ≥ 3 ≥ 2 ≥ 1',          breiten4311.every((b,i,a) => i===0 || a[i-1] >= b-0.01)],
+  ];
+
+  document.getElementById('checks').innerHTML = checks.map(([t, ok]) =>
+    `<span class="check-pill ${ok ? 'check-ok' : 'check-fail'}">${ok ? '✓' : '✗'} ${t}</span>`
+  ).join('');
+}
+
+document.getElementById('maxInput').addEventListener('keydown', e => { if (e.key === 'Enter') berechne(); });
+berechne();
+</script>
+
+</body>
+</html>
