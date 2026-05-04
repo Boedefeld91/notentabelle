@@ -154,7 +154,7 @@ function berechne() {
   const breiten4311 = [4,3,2,1].map(n => g[n][1] - g[n][0]);
   const checks = [
     ['Note-4-Untergrenze = 50 % der Max-Punkte', Math.abs(g[4][0] - mp*0.5) < 0.01],
-    ['Note-6-Obergrenze = 1/5 der Max-Punkte',   Math.abs(g[6][1] - mp/5) < 0.26],
+    ['Note-5-Untergrenze = 1/5 der Max-Punkte', Math.abs(g[5][0] - mp/5) < 0.01],
     ['Note-1-Obergrenze = Max-Punkte',            Math.abs(g[1][1] - mp) < 0.01],
     ['Längen-Priorität 4 ≥ 3 ≥ 2 ≥ 1',          breiten4311.every((b,i,a) => i===0 || a[i-1] >= b-0.01)],
   ];
