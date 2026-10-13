@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Notentabelle-Generator</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -17,36 +17,24 @@
   .sub { font-size: 14px; color: #666; margin-bottom: 20px; }
   hr { border: none; border-top: 1px solid #ddd; margin-bottom: 20px; }
 
-  .eingabe {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 24px;
-  }
+  .eingabe { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
   .eingabe label { font-size: 15px; }
-  .eingabe input {
-    font-size: 16px;
-    padding: 8px 12px;
-    border: 1px solid #ccc;
-    border-radius: 10px;
-    width: 110px;
-    background: white;
-    -webkit-appearance: none;
+  .eingabe input[type=number] {
+    font-size: 16px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 10px;
+    width: 110px; background: white; -webkit-appearance: none;
   }
-  .eingabe input:focus { outline: 2px solid #0078d4; border-color: transparent; }
+  .eingabe input[type=number]:focus { outline: 2px solid #0078d4; border-color: transparent; }
   .eingabe button {
-    font-size: 15px;
-    font-weight: 600;
-    padding: 8px 20px;
-    background: #0078d4;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
+    font-size: 15px; font-weight: 600; padding: 8px 20px; background: #0078d4; color: white;
+    border: none; border-radius: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent;
   }
   .eingabe button:active { background: #005fa3; }
+
+  .optionen { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-bottom: 24px; }
+  .optionen label { font-size: 15px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .optionen input { width: 18px; height: 18px; accent-color: #0078d4; }
+
+  .hinweis { font-size: 13px; color: #856404; background: #fff3cd; border-radius: 8px; padding: 8px 12px; margin-bottom: 16px; display: none; }
 
   .tabelle-wrapper { overflow-x: auto; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
   table { width: 100%; border-collapse: collapse; font-size: 15px; background: white; border-radius: 12px; overflow: hidden; }
@@ -55,25 +43,25 @@
   th:nth-child(2) { text-align: left; }
   td { padding: 9px 14px; text-align: center; border-top: 1px solid rgba(0,0,0,0.06); }
   td:nth-child(2) { text-align: left; }
+  tr.neue-note td { border-top: 2px solid rgba(0,0,0,0.18); }
 
   .note-gruen { background: #d4edda; color: #155724; }
   .note-gelb  { background: #fff3cd; color: #856404; }
   .note-rot   { background: #f8d7da; color: #721c24; }
 
   .checks { display: flex; flex-wrap: wrap; gap: 8px; }
-  .check-pill {
-    padding: 5px 12px;
-    border-radius: 20px;
-    font-size: 13px;
-  }
+  .check-pill { padding: 5px 12px; border-radius: 20px; font-size: 13px; }
   .check-ok   { background: #d4edda; color: #155724; }
   .check-fail { background: #f8d7da; color: #721c24; }
+  .section-label { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 10px; }
 
-  .section-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #555;
-    margin-bottom: 10px;
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) body { background: #1c1c1e; color: #eee; }
+    :root:not([data-theme="light"]) table { background: #2a2a2c; }
+    :root:not([data-theme="light"]) thead tr { background: #3a3a3c; }
+    :root:not([data-theme="light"]) th { color: #ccc; }
+    :root:not([data-theme="light"]) .sub, :root:not([data-theme="light"]) .section-label { color: #aaa; }
+    :root:not([data-theme="light"]) .eingabe input[type=number] { background: #2a2a2c; color: #eee; border-color: #555; }
   }
 </style>
 </head>
@@ -88,6 +76,14 @@
   <input type="number" id="maxInput" value="100" min="1" step="0.5" inputmode="decimal">
   <button onclick="berechne()">Berechnen</button>
 </div>
+
+<div class="optionen">
+  <label><input type="checkbox" id="halbeCb" checked> halbe Punkte</label>
+  <label><input type="checkbox" id="tendenzCb"> mit Tendenzen</label>
+  <label>Notenskala herabsetzen um <input type="number" id="herabInput" value="0" min="0" step="0.5" inputmode="decimal" style="width:80px;font-size:16px;padding:6px 10px;border:1px solid #ccc;border-radius:10px;"> Punkte</label>
+</div>
+
+<div class="hinweis" id="hinweis"></div>
 
 <div class="tabelle-wrapper">
   <table id="tabelle">
@@ -108,62 +104,129 @@
 <div class="checks" id="checks"></div>
 
 <script>
-function rundeAufHalbe(w) { return Math.round(w * 2) / 2; }
+function runde(w, s) { return Math.round(w / s) * s; }
 
-function berechneGrenzen(mp) {
-  // Note 5 Untergrenze = 1/5 der Maximalpunktzahl
-  const g5u = rundeAufHalbe(mp / 5);
-  // Note 6: 0 bis (g5u - 0.5)
-  const g6o = g5u - 0.5;
-  // Note 4 Untergrenze = 50% der Maximalpunktzahl
-  const g4u = rundeAufHalbe(mp * 0.5);
-  // Note 5 Obergrenze = direkt unter Note 4 Untergrenze
-  const g5o = g4u - 0.5;
-
-  const reineSpanne = mp - g4u - 3 * 0.5;
-  const schritte = Math.round(reineSpanne / 0.5);
+// Grenzen der ganzen Noten; s = Schrittweite (0.5 oder 1)
+function berechneGrenzen(mp, s, d) {
+  const g6o = runde(mp / 5, s);
+  const g4u = runde(mp * 0.5, s) - d;
+  const g5u = g6o + s, g5o = g4u - s;
+  const reineSpanne = mp - g4u - 3 * s;
+  const schritte = Math.round(reineSpanne / s);
   const basis = Math.floor(schritte / 4), rest = schritte % 4;
-  const breiten = [basis*0.5, basis*0.5, basis*0.5, basis*0.5];
-  for (let i = 0; i < rest; i++) breiten[i] += 0.5;
+  const breiten = [basis * s, basis * s, basis * s, basis * s];
+  for (let i = 0; i < rest; i++) breiten[i] += s;
   const g = {};
   let uk = g4u;
   [4, 3, 2, 1].forEach((n, i) => {
     const ok = uk + breiten[i];
     g[n] = [uk, ok];
-    uk = ok + 0.5;
+    uk = ok + s;
   });
   g[5] = [g5u, g5o];
   g[6] = [0, g6o];
   return g;
 }
 
+// Teilt [u,o] in drei (möglichst gleich große) Intervalle: [+, ganz, -]
+// Rest 1 -> "-" größer, Rest 2 -> "-" und ganze Note größer ("+" ist am kleinsten)
+function teileTendenz(u, o, s) {
+  const n = Math.round((o - u) / s) + 1;           // Anzahl möglicher Punktwerte
+  const base = Math.floor(n / 3), rest = n % 3;
+  const c = [base, base, base];                      // [+, ganz, -]
+  if (rest >= 1) c[2]++;
+  if (rest === 2) c[1]++;
+  const res = [];
+  let top = o;
+  c.forEach(k => {
+    if (k <= 0) { res.push(null); return; }
+    const lo = top - (k - 1) * s;
+    res.push([lo, top]);
+    top = lo - s;
+  });
+  return res;
+}
+
 function berechne() {
+  const halbe = document.getElementById('halbeCb').checked;
+  const tend = document.getElementById('tendenzCb').checked;
+  const s = halbe ? 0.5 : 1;
+  const dez = halbe ? 1 : 0;
+
   const raw = document.getElementById('maxInput').value.replace(',', '.');
-  const mp = parseFloat(raw);
+  let mp = parseFloat(raw);
   if (!mp || mp <= 0) { alert('Bitte eine positive Zahl eingeben (z. B. 100 oder 57,5).'); return; }
 
-  const g = berechneGrenzen(mp);
+  const hinweis = document.getElementById('hinweis');
+  if (Math.abs(mp / s - Math.round(mp / s)) > 1e-9) {
+    const neu = runde(mp, s);
+    hinweis.textContent = 'Maximalpunktzahl ' + String(mp).replace('.', ',') + ' passt nicht zu ganzen Punkten und wurde auf ' + String(neu).replace('.', ',') + ' gerundet.';
+    hinweis.style.display = 'block';
+    mp = neu;
+    document.getElementById('maxInput').value = mp;
+  } else {
+    hinweis.style.display = 'none';
+  }
+
+  const zeigeHinweis = t => {
+    hinweis.textContent = hinweis.style.display === 'block' ? hinweis.textContent + ' ' + t : t;
+    hinweis.style.display = 'block';
+  };
+  const dRaw = parseFloat(document.getElementById('herabInput').value.replace(',', '.')) || 0;
+  let d = Math.max(0, runde(dRaw, s));
+  const dMax = Math.max(0, runde(mp * 0.5, s) - runde(mp / 5, s) - 2 * s);
+  if (d > dMax) {
+    d = dMax;
+    zeigeHinweis('Die Herabsetzung wurde auf ' + String(d).replace('.', ',') + ' Punkte begrenzt, damit die Note 5 noch einen Punktebereich behält.');
+  } else if (d !== dRaw) {
+    zeigeHinweis('Die Herabsetzung wurde auf ' + String(d).replace('.', ',') + ' Punkte angepasst.');
+  }
+  if (d !== dRaw) document.getElementById('herabInput').value = d;
+
+  const g = berechneGrenzen(mp, s, d);
   const bez = {1:'Sehr gut', 2:'Gut', 3:'Befriedigend', 4:'Ausreichend', 5:'Mangelhaft', 6:'Ungenügend'};
   const cls = {1:'note-gruen', 2:'note-gruen', 3:'note-gelb', 4:'note-gelb', 5:'note-rot', 6:'note-rot'};
+  const f = x => x.toFixed(dez);
 
-  document.getElementById('tbody').innerHTML = [1,2,3,4,5,6].map(n => {
-    const [u, o] = g[n], b = o - u;
-    return `<tr class="${cls[n]}">
-      <td><strong>${n}</strong></td>
-      <td>${bez[n]}</td>
-      <td>${u.toFixed(1)}</td>
-      <td>${o.toFixed(1)}</td>
-      <td>${b.toFixed(1)}</td>
-    </tr>`;
-  }).join('');
+  let html = '';
+  let tendenzOk = true;
+  [1,2,3,4,5,6].forEach(n => {
+    const [u, o] = g[n];
+    if (tend && n <= 5) {
+      const teile = teileTendenz(u, o, s);
+      const labels = [n + '+', String(n), n + '−'];
+      const ks = teile.filter(Boolean).map(t => t[1] - t[0]);
+      if (teile.some(t => !t) || Math.max(...ks) - Math.min(...ks) > s + 0.01) tendenzOk = false;
+      teile.forEach((t, i) => {
+        html += `<tr class="${cls[n]}${i === 0 ? ' neue-note' : ''}">
+          <td><strong>${labels[i]}</strong></td>
+          <td>${i === 0 ? bez[n] : ''}</td>
+          <td>${t ? f(t[0]) : '–'}</td>
+          <td>${t ? f(t[1]) : '–'}</td>
+          <td>${t ? f(t[1] - t[0]) : '–'}</td>
+        </tr>`;
+      });
+    } else {
+      html += `<tr class="${cls[n]}${tend ? ' neue-note' : ''}">
+        <td><strong>${n}</strong></td>
+        <td>${bez[n]}</td>
+        <td>${f(u)}</td>
+        <td>${f(o)}</td>
+        <td>${f(o - u)}</td>
+      </tr>`;
+    }
+  });
+  document.getElementById('tbody').innerHTML = html;
 
   const breiten4311 = [4,3,2,1].map(n => g[n][1] - g[n][0]);
+  const tol = s / 2 + 0.01;
   const checks = [
-    ['Note-4-Untergrenze = 50 % der Max-Punkte', Math.abs(g[4][0] - mp*0.5) < 0.01],
-    ['Note-5-Untergrenze = 1/5 der Max-Punkte',  Math.abs(g[5][0] - mp/5) < 0.26],
+    ['Note-4-Untergrenze ≈ 50 % der Max-Punkte' + (d ? ' − ' + f(d) : ''), Math.abs(g[4][0] - (mp * 0.5 - d)) < tol],
+    ['Note-6-Obergrenze ≈ 1/5 der Max-Punkte',   Math.abs(g[6][1] - mp / 5) < tol],
     ['Note-1-Obergrenze = Max-Punkte',            Math.abs(g[1][1] - mp) < 0.01],
-    ['Längen-Priorität 4 ≥ 3 ≥ 2 ≥ 1',          breiten4311.every((b,i,a) => i===0 || a[i-1] >= b-0.01)],
+    ['Längen-Priorität 4 ≥ 3 ≥ 2 ≥ 1',          breiten4311.every((b, i, a) => i === 0 || a[i-1] >= b - 0.01)],
   ];
+  if (tend) checks.push(['Tendenzen: Teilintervalle gleich groß (max. 1 Schritt Abweichung)', tendenzOk]);
 
   document.getElementById('checks').innerHTML = checks.map(([t, ok]) =>
     `<span class="check-pill ${ok ? 'check-ok' : 'check-fail'}">${ok ? '✓' : '✗'} ${t}</span>`
@@ -171,6 +234,10 @@ function berechne() {
 }
 
 document.getElementById('maxInput').addEventListener('keydown', e => { if (e.key === 'Enter') berechne(); });
+document.getElementById('halbeCb').addEventListener('change', berechne);
+document.getElementById('tendenzCb').addEventListener('change', berechne);
+document.getElementById('herabInput').addEventListener('change', berechne);
+document.getElementById('herabInput').addEventListener('keydown', e => { if (e.key === 'Enter') berechne(); });
 berechne();
 </script>
 
